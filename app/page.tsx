@@ -1,0 +1,123 @@
+'use client';
+
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
+import { AppLayout } from '@/components/Layout';
+import Link from 'next/link';
+import { Plus, FileText, Calendar, Edit, Trash2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
+
+export default function FormsPage() {
+  const router = useRouter();
+  const forms = useLiveQuery(() => db.forms.orderBy('updatedAt').reverse().toArray());
+
+  const createForm = async () => {
+    const id = uuidv4();
+    await db.forms.add({
+      id,
+      title: 'Yeni Karar Formu',
+      documentDate: new Date().toLocaleDateString('tr-TR'),
+      decisionNo: '2023/ 01',
+      decisionDate: new Date().toISOString().split('T')[0],
+      decisionTime: '10:00',
+      isPostponed: false,
+      headerTop: 'T.C\n.......... İLİ\n.......... BAŞKANLIĞI',
+      headerMiddle: '',
+      headerBottom: '',
+      headerLine4: 'Tarih ve Karar No',
+      items: [
+        {
+          id: uuidv4(),
+          type: 'numbered',
+          text: 'Örnek kişinin talebi',
+        }
+      ],
+      footerText: 'Yukarıda maddeler halinde belirtilen yardım talepleri görüşülmüş olup verilen kararlar oy birliği ile alınmıştır.',
+      signatureMembers: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      layout: { lineSpacing: 'normal', tablePadding: 'normal' }
+    });
+    router.push(`/forms/${id}`);
+  };
+
+  const deleteForm = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (confirm('Bu formu silmek istediğinize emin misiniz?')) {
+      await db.forms.delete(id);
+    }
+  };
+
+  return (
+    <AppLayout>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase">Karar Formları</h1>
+          <p className="text-slate-500 mt-1 text-sm font-medium">Hazırlanmış karar ve gündem formları</p>
+        </div>
+        <button
+          onClick={createForm}
+          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded text-sm font-bold transition-colors shadow-sm"
+        >
+          <Plus className="w-5 h-5" />
+          YENİ FORM OLUŞTUR
+        </button>
+      </div>
+
+      {!forms ? (
+        <div className="text-center py-12 text-slate-500">Yükleniyor...</div>
+      ) : forms.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded border border-slate-300 shadow-sm">
+          <div className="w-16 h-16 bg-blue-50 text-blue-700 rounded flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2 uppercase">Henüz form bulunmuyor</h3>
+          <p className="text-slate-500 max-w-md mx-auto mb-6 text-sm">
+            Yeni bir karar veya gündem formu oluşturarak başlayabilirsiniz.
+          </p>
+          <button
+            onClick={createForm}
+            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded text-sm font-bold transition-colors mx-auto shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            İLK FORMU OLUŞTUR
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {forms.map(form => (
+            <Link key={form.id} href={`/forms/${form.id}`} className="block group">
+              <div className="bg-white rounded border border-slate-300 p-5 hover:border-blue-500 hover:shadow-md transition-all h-full flex flex-col relative z-0">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="bg-blue-50 text-blue-700 p-2 rounded">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <button 
+                    onClick={(e) => deleteForm(form.id, e)}
+                    className="text-slate-400 hover:text-red-600 p-1 bg-white hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 relative"
+                    title="Formu Sil"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <h3 className="font-bold text-slate-900 text-lg mb-2 line-clamp-2 leading-tight uppercase text-sm">
+                  {form.title || 'İSİMSİZ FORM'}
+                </h3>
+                <div className="text-[13px] font-medium text-slate-500 flex flex-col gap-1.5 mt-auto pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold uppercase text-xs text-slate-400">Karar No:</span> {form.decisionNo}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-slate-400" />
+                    <span>{new Date(form.updatedAt).toLocaleDateString('tr-TR')}</span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </AppLayout>
+  );
+}
