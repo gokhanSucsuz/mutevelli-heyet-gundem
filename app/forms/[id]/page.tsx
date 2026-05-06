@@ -27,14 +27,14 @@ function PrintPreview({ form, members, settings }: { form: OfficialForm, members
     relaxed: 'p-3'
   };
   const spacing = activeLayout?.lineSpacing || 'normal';
-  const itemSpaceY = spacing === 'tight' ? 'space-y-2' : spacing === 'relaxed' ? 'space-y-6' : 'space-y-4';
+  const itemGap = activeLayout?.itemSpacing !== undefined ? `${activeLayout.itemSpacing}px` : (spacing === 'tight' ? '8px' : spacing === 'relaxed' ? '24px' : '16px');
 
   const paddingKey = (activeLayout?.tablePadding || 'normal') as keyof typeof tablePaddings;
 const tablePad = tablePaddings[paddingKey];
 
-  const marginX = activeLayout?.marginX ?? 15;
-  const marginY = activeLayout?.marginY ?? 15;
-  const signatureSpacing = activeLayout?.signatureSpacing ?? 40; 
+  const marginX = activeLayout?.marginX ?? 10;
+  const marginY = activeLayout?.marginY ?? 10;
+  const signatureSpacing = activeLayout?.signatureSpacing ?? 1; 
 
   // Use snapshots if available, otherwise current members
   const finalSigners = form.signatureSnapshots && form.signatureSnapshots.length > 0
@@ -66,13 +66,13 @@ const tablePad = tablePaddings[paddingKey];
 
     return (
       <div key={item.id} className="flex flex-col gap-2">
-        <div className="flex text-justify items-start">
-          <span className="font-bold mr-2 whitespace-nowrap min-w-[20px] leading-tight">{numbering}</span>
+        <div className="flex text-justify items-baseline">
+          <span className="font-bold mr-2 whitespace-nowrap min-w-[20px]" style={{ lineHeight: '1.5' }}>{numbering}</span>
           <div className="flex-1 w-full overflow-hidden leading-tight">
             <div 
               className="rich-text-preview dotted-leader" 
               dangerouslySetInnerHTML={{ 
-                __html: (item.text || '').replace(/<p>(.*?)<\/p>/g, '<p><span class="text-content">$1</span></p>') 
+                __html: (item.text || '') 
               }} 
             />
           </div>
@@ -138,29 +138,31 @@ const tablePad = tablePaddings[paddingKey];
         paddingLeft: `${marginX}mm`,
         paddingRight: `${marginX}mm`,
         boxShadow: 'none', 
-        fontFamily: activeLayout?.fontFamily || 'Times New Roman, serif',
+        fontFamily: activeLayout?.fontFamily || 'Verdana, sans-serif',
       }}
     >
       
       {/* Watermark - Using fixed position for multi-page print support */}
-      {activeLayout?.watermarkText && (
+      {(activeLayout?.watermarkText || activeLayout?.watermarkText2) && (
         <div 
           className="watermark-overlay fixed inset-0 pointer-events-none flex justify-center items-center overflow-hidden"
           style={{ zIndex: 0, position: 'fixed' }}
         >
           <div 
-            className="font-bold whitespace-nowrap text-center opacity-10"
+            className="font-bold text-center flex flex-col"
             style={{ 
                transform: `rotate(${activeLayout?.watermarkAngle ?? -45}deg)`,
-               fontSize: activeLayout?.watermarkSize ? `${activeLayout?.watermarkSize}px` : '120px',
+               fontSize: activeLayout?.watermarkSize ? `${activeLayout?.watermarkSize}px` : '36px',
                color: 'black',
-               opacity: (activeLayout?.watermarkOpacity ?? 10) / 100,
-               lineHeight: 1,
+               opacity: (activeLayout?.watermarkOpacity ?? 5) / 100,
+               lineHeight: 1.2,
                width: '200%', 
-               maxWidth: 'none'
+               maxWidth: 'none',
+               whiteSpace: 'nowrap'
             }}
           >
-            {activeLayout.watermarkText}
+            {activeLayout.watermarkText && <div>{activeLayout.watermarkText}</div>}
+            {activeLayout.watermarkText2 && <div>{activeLayout.watermarkText2}</div>}
           </div>
         </div>
       )}
@@ -174,7 +176,7 @@ const tablePad = tablePaddings[paddingKey];
           ) : <div className="h-[25mm] w-[25mm] shrink-0" />}
           
           <div className="flex-1 px-4 mt-2" style={{ 
-            fontSize: activeLayout?.fontSizeTitle ? `${activeLayout?.fontSizeTitle}px` : 'inherit',
+            fontSize: activeLayout?.fontSizeTitle ? `${activeLayout?.fontSizeTitle}px` : '12px',
             lineHeight: activeLayout?.headerLineSpacing || 'normal'
           }}>
             {form.headerTop.includes('<') ? (
@@ -216,14 +218,22 @@ const tablePad = tablePaddings[paddingKey];
         </div>
 
         {/* Items */}
-        <div className={`${itemSpaceY} flex-1`} style={{ fontSize: form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '15px' }}>
+        <div 
+          className="flex flex-col flex-1" 
+          style={{ 
+            fontSize: activeLayout?.fontSizeContent ? `${activeLayout?.fontSizeContent}px` : '11px',
+            gap: itemGap,
+            lineHeight: activeLayout?.itemLineHeight || 1.5,
+            paddingLeft: activeLayout?.itemIndent ? `${activeLayout.itemIndent}px` : '0px'
+          }}
+        >
           {form.items?.map((item, index) => renderItem(item, index))}
         </div>
 
         {/* Decision Note and Signatures - Kept together on same page */}
         <div className="break-inside-avoid mt-8">
           {/* Footer Text */}
-          <div className="font-bold text-center text-[14px]" style={{ fontSize: form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '14px' }}>
+          <div className="font-bold text-center text-[14px]" style={{ fontSize: activeLayout?.fontSizeContent ? `${activeLayout?.fontSizeContent}px` : '11px' }}>
             {form.footerText.includes('<') ? (
               <div className="rich-text-preview" dangerouslySetInnerHTML={{ __html: form.footerText }} />
             ) : (
@@ -241,12 +251,12 @@ const tablePad = tablePaddings[paddingKey];
                 {topSigners.map(m => (
                   <div key={m.id} className="flex flex-col items-center w-[30%] min-w-[150px]">
                     <div className="font-bold whitespace-pre-wrap" style={{ 
-                      fontSize: form.layout?.signatureFontSize ? `${form.layout?.signatureFontSize}px` : (form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '14px'),
+                      fontSize: activeLayout?.signatureFontSize ? `${activeLayout?.signatureFontSize}px` : '12px',
                       lineHeight: 1.1
                     }}>{formatMemberTitle(m)}</div>
                     <div style={{ height: `${signatureSpacing}px` }}></div> {/* Signature Space */}
                     <div className="font-bold" style={{ 
-                      fontSize: form.layout?.signatureFontSize ? `${form.layout?.signatureFontSize}px` : (form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '14px'),
+                      fontSize: activeLayout?.signatureFontSize ? `${activeLayout?.signatureFontSize}px` : '12px',
                       lineHeight: 1.1
                     }}>{formatMemberName(m)}</div>
                   </div>
@@ -259,12 +269,12 @@ const tablePad = tablePaddings[paddingKey];
                 {otherSigners.map((m) => (
                   <div key={m.id} className="flex flex-col items-center w-[22%] min-w-[120px]">
                     <div className="font-bold whitespace-pre-wrap" style={{ 
-                      fontSize: form.layout?.signatureFontSize ? `${form.layout?.signatureFontSize}px` : (form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '14px'),
+                      fontSize: activeLayout?.signatureFontSize ? `${activeLayout?.signatureFontSize}px` : '12px',
                       lineHeight: 1.1
                     }}>{formatMemberTitle(m)}</div>
                     <div style={{ height: `${signatureSpacing}px` }}></div> {/* Signature Space */}
                     <div className="font-bold" style={{ 
-                      fontSize: form.layout?.signatureFontSize ? `${form.layout?.signatureFontSize}px` : (form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '14px'),
+                      fontSize: activeLayout?.signatureFontSize ? `${activeLayout?.signatureFontSize}px` : '12px',
                       lineHeight: 1.1
                     }}>{formatMemberName(m)}</div>
                   </div>
@@ -286,28 +296,21 @@ const tablePad = tablePaddings[paddingKey];
 
       <style dangerouslySetInnerHTML={{__html: `
         .dotted-leader p { 
-           display: flex;
-           flex-wrap: wrap;
-           align-items: baseline;
-           width: 100%;
+           position: relative;
+           overflow: hidden;
            margin-bottom: 0px !important;
            line-height: 1.5;
-           row-gap: 1.2em; /* Metin yüksekliği kadar (veya yakını) dikey boşluk */
-        }
-        .dotted-leader p span.text-content {
-          flex: 0 0 auto;
-          display: inline;
-          padding-right: 0px;
         }
         .dotted-leader p::after {
-          content: "";
-          flex: 1 0 10%; 
-          border-bottom: 1.5pt dotted black;
-          height: 0px;
-          margin-left: 1ch; /* Metin bittikten sonra tam bir karakter boşluk */
-          margin-bottom: 0.15em;
+           content: "";
+           display: inline-block;
+           width: 3000px;
+           margin-right: -3000px;
+           border-bottom: 1.5pt dotted black;
+           margin-left: 8px;
+           vertical-align: 0.08em;
         }
-        .rich-text-preview p { margin-bottom: 0.5rem; }
+        .rich-text-preview p { margin-top: 0px !important; margin-bottom: 0.5rem; }
         .rich-text-preview p:last-child { margin-bottom: 0; }
         
         .header-rich-text p { margin-bottom: 0px; text-align: center; }
@@ -409,6 +412,20 @@ export default function FormEditorPage() {
       setLocalForm(form);
     }
   }, [form, id]);
+
+  useEffect(() => {
+    if (!localForm || isSaving) return;
+    
+    const formattedDate = localForm.decisionDate ? new Date(localForm.decisionDate).toLocaleDateString('tr-TR') : '';
+    const newHeader = `${formattedDate}${formattedDate && localForm.decisionNo ? ' - ' : ''}${localForm.decisionNo || ''}`;
+    
+    if (newHeader && localForm.headerLine4 !== newHeader && !localForm.isLocked) {
+      const updated = { ...localForm, headerLine4: newHeader, updatedAt: Date.now() };
+      setLocalForm(updated);
+      setIsDirty(true);
+      localStorage.setItem(`draft_form_${id}`, JSON.stringify(updated));
+    }
+  }, [localForm?.decisionDate, localForm?.decisionNo, id]);
 
   const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: localForm?.title || 'Karar Formu' });
 
@@ -635,13 +652,17 @@ export default function FormEditorPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Karar No</label>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase block">Karar No</label>
+                        {!localForm.isPostponed && <Lock className="w-3 h-3 text-slate-400" />}
+                      </div>
                       <input 
-                        className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${localForm.isLocked && !localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
+                        className={`w-full text-sm border border-slate-300 rounded p-2 outline-none transition-all ${!localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500 border-blue-200'}`} 
                         value={localForm.decisionNo || ''}
-                        disabled={localForm.isLocked && !localForm.isPostponed}
+                        disabled={!localForm.isPostponed}
                         onChange={(e) => updateForm({ decisionNo: e.target.value })}
                       />
+                      {!localForm.isPostponed && <p className="text-[10px] text-slate-400 mt-1 italic">* Değiştirmek için 'Ertelendi' seçiniz.</p>}
                     </div>
                   </div>
 

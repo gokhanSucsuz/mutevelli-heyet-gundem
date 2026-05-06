@@ -36,7 +36,19 @@ export default function FormsPage() {
       signatureMembers: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      layout: { lineSpacing: 'normal', tablePadding: 'normal' }
+      layout: { 
+        fontFamily: 'Verdana, sans-serif',
+        fontSizeTitle: 12,
+        fontSizeContent: 11,
+        lineSpacing: 'normal', 
+        marginX: 10,
+        marginY: 10,
+        watermarkOpacity: 5,
+        watermarkSize: 36,
+        signatureFontSize: 12,
+        signatureSpacing: 1,
+        showPageNumbers: true
+      }
     });
     router.push(`/forms/${id}`);
   };

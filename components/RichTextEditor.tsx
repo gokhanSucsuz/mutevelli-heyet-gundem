@@ -2,7 +2,6 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import {
   Bold, Italic, Underline as UnderlineIcon,
@@ -25,7 +24,6 @@ const extensions = [
       keepAttributes: false,
     },
   }),
-  Underline,
   Highlight,
   Typography,
   TextAlign.configure({

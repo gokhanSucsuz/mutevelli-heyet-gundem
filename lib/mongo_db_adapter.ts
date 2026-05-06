@@ -123,6 +123,20 @@ class MongoTable<T extends { id: string }> {
     return arr.length;
   }
 
+  async clear(): Promise<void> {
+    const arr = await this.toArray();
+    for (const item of arr) {
+      await this.delete(item.id);
+    }
+  }
+
+  async bulkAdd(data: T[]): Promise<void> {
+    for (const item of data) {
+      await this.add(item);
+    }
+    window.dispatchEvent(new CustomEvent(`db-update-${this.collection}`));
+  }
+
   // Add more methods as needed by the UI
   orderBy(field: string) {
     return {

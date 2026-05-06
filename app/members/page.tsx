@@ -1,17 +1,40 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, useLiveQuery, Member } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Trash2, GripVertical, UserCheck, UserPlus } from 'lucide-react';
-import { DebouncedInput } from '@/components/DebouncedInput';
+import { Plus, Trash2, GripVertical, UserCheck, UserPlus, Save, Loader2 } from 'lucide-react';
 
 export default function MembersPage() {
   const members = useLiveQuery(() => db.members.orderBy('order').toArray());
-  
-  const addMember = async () => {
-    const order = members ? members.length : 0;
+  const [localMembers, setLocalMembers] = useState<Member[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (members) {
+      const draft = localStorage.getItem('draft_members');
+      if (draft) {
+        try {
+          const draftData = JSON.parse(draft);
+          setLocalMembers(draftData);
+          setIsDirty(true);
+          return;
+        } catch (e) {}
+      }
+      setLocalMembers(members);
+    }
+  }, [members]);
+
+  const updateLocalAndDraft = (newList: Member[]) => {
+    setLocalMembers(newList);
+    setIsDirty(true);
+    localStorage.setItem('draft_members', JSON.stringify(newList));
+  };
+
+  const addMember = () => {
+    const order = localMembers.length;
     const newMember: Member = {
       id: uuidv4(),
       name: 'Yeni Kişi',
@@ -19,16 +42,33 @@ export default function MembersPage() {
       order,
       isProxy: false
     };
-    await db.members.add(newMember);
+    updateLocalAndDraft([...localMembers, newMember]);
   };
 
-  const updateMember = async (id: string, updates: Partial<Member>) => {
-    await db.members.update(id, updates);
+  const updateMember = (id: string, updates: Partial<Member>) => {
+    const newList = localMembers.map(m => m.id === id ? { ...m, ...updates } : m);
+    updateLocalAndDraft(newList);
   };
 
-  const deleteMember = async (id: string) => {
+  const deleteMember = (id: string) => {
     if (confirm('Silmek istediğinize emin misiniz?')) {
-      await db.members.delete(id);
+      const newList = localMembers.filter(m => m.id !== id);
+      updateLocalAndDraft(newList);
+    }
+  };
+
+  const saveToCloud = async () => {
+    setIsSaving(true);
+    try {
+      // Delete all and put new list to sync exactly
+      await db.members.clear();
+      await db.members.bulkAdd(localMembers);
+      setIsDirty(false);
+      localStorage.removeItem('draft_members');
+    } catch (e) {
+      alert('Hata: Üyeler kaydedilemedi.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -40,13 +80,25 @@ export default function MembersPage() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase">Mütevelli Heyet Üyeleri</h1>
             <p className="text-slate-500 mt-1 text-sm font-medium">Toplantı gündemlerini imzalayacak heyet üyeleri ve vekil bilgileri.</p>
           </div>
-          <button
-            onClick={addMember}
-            className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider"
-          >
-            <Plus className="w-5 h-5" />
-            YENİ ÜYE EKLE
-          </button>
+          <div className="flex gap-3">
+            {isDirty && (
+              <button
+                onClick={saveToCloud}
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                ÜYELERİ BULUTA KAYDET
+              </button>
+            )}
+            <button
+              onClick={addMember}
+              className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider"
+            >
+              <Plus className="w-5 h-5" />
+              YENİ ÜYE EKLE
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-300 overflow-hidden">
@@ -59,29 +111,27 @@ export default function MembersPage() {
           </div>
           
           <div className="divide-y divide-slate-100">
-            {!members ? (
-              <div className="p-12 text-center text-slate-400 font-medium">Yükleniyor...</div>
-            ) : members.length === 0 ? (
+            {localMembers.length === 0 ? (
               <div className="p-12 text-center text-slate-400 font-medium italic">Henüz üye eklenmemiş. "Yeni Üye Ekle" butonu ile başlayın.</div>
             ) : (
-              members.map((member) => (
+              localMembers.map((member) => (
                 <div key={member.id} className="grid grid-cols-12 gap-4 p-5 items-center group hover:bg-blue-50/30 transition-colors">
                   <div className="col-span-1 flex items-center justify-center text-slate-300">
                     <GripVertical className="w-5 h-5" />
                   </div>
                   <div className="col-span-3 space-y-2">
-                    <DebouncedInput
+                    <input
                       type="text"
                       className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none shadow-sm"
                       value={member.name}
-                      onChange={(val) => updateMember(member.id, { name: val })}
+                      onChange={(e) => updateMember(member.id, { name: e.target.value })}
                       placeholder="Adı Soyadı"
                     />
-                    <DebouncedInput
+                    <input
                       type="text"
                       className="w-full bg-white/50 border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none shadow-sm"
                       value={member.title}
-                      onChange={(val) => updateMember(member.id, { title: val })}
+                      onChange={(e) => updateMember(member.id, { title: e.target.value })}
                       placeholder="Ünvan (Örn: Üye, Vali Yrd.)"
                     />
                   </div>
@@ -99,18 +149,18 @@ export default function MembersPage() {
                   <div className="col-span-5">
                     {member.isProxy ? (
                       <div className="grid grid-cols-2 gap-3">
-                        <DebouncedInput
+                        <input
                           type="text"
                           className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none"
                           value={member.proxyName || ''}
-                          onChange={(val) => updateMember(member.id, { proxyName: val })}
+                          onChange={(e) => updateMember(member.id, { proxyName: e.target.value })}
                           placeholder="Vekil Adı Soyadı"
                         />
-                        <DebouncedInput
+                        <input
                           type="text"
                           className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none"
                           value={member.proxyTitle || ''}
-                          onChange={(val) => updateMember(member.id, { proxyTitle: val })}
+                          onChange={(e) => updateMember(member.id, { proxyTitle: e.target.value })}
                           placeholder="Vekil Ünvanı"
                         />
                       </div>
