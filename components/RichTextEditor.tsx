@@ -78,7 +78,7 @@ export function RichTextEditor({
       // Small optimization: only update if the change is significant
       // and we are not currently focused (to avoid jumping while typing)
       if (!editor.isFocused) {
-        editor.commands.setContent(value, false);
+        editor.commands.setContent(value, { emitUpdate: false });
       }
     }
   }, [value, editor]);
