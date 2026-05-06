@@ -27,7 +27,6 @@ function PrintPreview({ form, members, settings }: { form: OfficialForm, members
   };
   const spacing = activeLayout?.lineSpacing || 'normal';
   const itemSpaceY = spacing === 'tight' ? 'space-y-2' : spacing === 'relaxed' ? 'space-y-6' : 'space-y-4';
-  const tablePad = tablePaddings[activeLayout?.tablePadding || 'normal'];
 
   const paddingKey = (activeLayout?.tablePadding || 'normal') as keyof typeof tablePaddings;
 const tablePad = tablePaddings[paddingKey];
