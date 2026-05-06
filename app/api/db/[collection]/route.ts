@@ -61,7 +61,11 @@ export async function GET(
     return NextResponse.json(decryptedDocs);
   } catch (error: any) {
     console.error('API GET ERROR:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message, 
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      hint: !process.env.MONGODB_URI ? 'MONGODB_URI is missing' : 'Check IP whitelist on MongoDB Atlas'
+    }, { status: 500 });
   }
 }
 

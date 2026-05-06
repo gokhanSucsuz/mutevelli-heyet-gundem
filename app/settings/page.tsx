@@ -23,7 +23,7 @@ export default function SettingsPage() {
           setLocalSettings(draftData);
           setIsDirty(true);
           return;
-        } catch (e) {}
+        } catch (e) { console.error('Settings draft error', e); }
       }
       setLocalSettings(settings);
     } else {
@@ -38,19 +38,24 @@ export default function SettingsPage() {
           marginX: 10,
           marginY: 10,
           watermarkText: '',
+          watermarkText2: '',
           watermarkOpacity: 5,
           watermarkAngle: -45,
           watermarkSize: 36,
           signatureFontFamily: 'Verdana, sans-serif',
           signatureFontSize: 12,
           signatureSpacing: 1,
-          showPageNumbers: true
+          showPageNumbers: true,
+          itemSpacing: 24,
+          itemLineHeight: 1.5,
+          itemIndent: 0
         }
       });
     }
   }, [settings]);
 
   const updateSettings = (updates: any) => {
+    if (!localSettings) return;
     const updated = { ...localSettings, ...updates, updatedAt: Date.now() };
     if (updates.layout) {
       updated.layout = { ...localSettings.layout, ...updates.layout };
@@ -61,11 +66,13 @@ export default function SettingsPage() {
   };
 
   const saveToCloud = async () => {
+    if (!localSettings || isSaving) return;
     setIsSaving(true);
     try {
       await db.settings.put(localSettings);
       setIsDirty(false);
       localStorage.removeItem('draft_settings');
+      alert('Ayarlar başarıyla kaydedildi.');
     } catch (e) {
       alert('Hata: Ayarlar kaydedilemedi.');
     } finally {
@@ -73,7 +80,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleImageUpload = (side: 'left' | 'right') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (side: 'left' | 'right') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -101,17 +108,17 @@ export default function SettingsPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto">
+      <div className={`max-w-5xl mx-auto transition-opacity ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase">Ayarlar</h1>
-            <p className="text-slate-500 mt-1 text-sm font-medium">Logo ve sayfa ayarları.</p>
+            <p className="text-slate-500 mt-1 text-sm font-medium">Logo, sayfa düzeni ve mizanpaj ayarları.</p>
           </div>
           {isDirty && (
             <button
               onClick={saveToCloud}
               disabled={isSaving}
-              className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider disabled:opacity-50"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               AYARLARI BULUTA KAYDET

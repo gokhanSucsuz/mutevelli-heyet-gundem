@@ -5,6 +5,7 @@ import { db, useLiveQuery, Member } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Trash2, GripVertical, UserCheck, UserPlus, Save, Loader2 } from 'lucide-react';
+import { DebouncedInput } from '@/components/DebouncedInput';
 
 export default function MembersPage() {
   const members = useLiveQuery(() => db.members.orderBy('order').toArray());
@@ -21,7 +22,7 @@ export default function MembersPage() {
           setLocalMembers(draftData);
           setIsDirty(true);
           return;
-        } catch (e) {}
+        } catch (e) { console.error('Members draft error', e); }
       }
       setLocalMembers(members);
     }
@@ -58,34 +59,40 @@ export default function MembersPage() {
   };
 
   const saveToCloud = async () => {
+    if (isSaving) return;
     setIsSaving(true);
     try {
-      // Delete all and put new list to sync exactly
+      // Clear and bulk add to sync exactly with local state
       await db.members.clear();
-      await db.members.bulkAdd(localMembers);
+      for (const m of localMembers) {
+        await db.members.put(m);
+      }
       setIsDirty(false);
       localStorage.removeItem('draft_members');
+      alert('Üye listesi başarıyla güncellendi.');
     } catch (e) {
-      alert('Hata: Üyeler kaydedilemedi.');
+      alert('Kaydedilirken bir hata oluştu.');
     } finally {
       setIsSaving(false);
     }
   };
 
+  if (!localMembers) return <div className="p-8 text-center font-bold text-slate-500">Yükleniyor...</div>;
+
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto">
+      <div className={`max-w-5xl mx-auto transition-opacity ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase">Mütevelli Heyet Üyeleri</h1>
             <p className="text-slate-500 mt-1 text-sm font-medium">Toplantı gündemlerini imzalayacak heyet üyeleri ve vekil bilgileri.</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             {isDirty && (
               <button
                 onClick={saveToCloud}
                 disabled={isSaving}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider disabled:opacity-50"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 ÜYELERİ BULUTA KAYDET
@@ -93,7 +100,8 @@ export default function MembersPage() {
             )}
             <button
               onClick={addMember}
-              className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider"
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 uppercase tracking-wider"
             >
               <Plus className="w-5 h-5" />
               YENİ ÜYE EKLE
@@ -122,14 +130,16 @@ export default function MembersPage() {
                   <div className="col-span-3 space-y-2">
                     <input
                       type="text"
-                      className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none shadow-sm"
+                      disabled={isSaving}
+                      className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none shadow-sm disabled:bg-slate-50"
                       value={member.name}
                       onChange={(e) => updateMember(member.id, { name: e.target.value })}
                       placeholder="Adı Soyadı"
                     />
                     <input
                       type="text"
-                      className="w-full bg-white/50 border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none shadow-sm"
+                      disabled={isSaving}
+                      className="w-full bg-white/50 border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none shadow-sm disabled:bg-slate-50"
                       value={member.title}
                       onChange={(e) => updateMember(member.id, { title: e.target.value })}
                       placeholder="Ünvan (Örn: Üye, Vali Yrd.)"
@@ -137,10 +147,11 @@ export default function MembersPage() {
                   </div>
                   <div className="col-span-1 flex justify-center">
                     <button
+                      disabled={isSaving}
                       onClick={() => updateMember(member.id, { isProxy: !member.isProxy })}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm ${
                         member.isProxy ? 'bg-orange-100 text-orange-600 border border-orange-200' : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200'
-                      }`}
+                      } disabled:opacity-50`}
                       title={member.isProxy ? 'Vekaleti Kaldır' : 'Vekil Ata'}
                     >
                       <UserPlus className="w-5 h-5" />
@@ -151,14 +162,16 @@ export default function MembersPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <input
                           type="text"
-                          className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none"
+                          disabled={isSaving}
+                          className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none disabled:opacity-50"
                           value={member.proxyName || ''}
                           onChange={(e) => updateMember(member.id, { proxyName: e.target.value })}
                           placeholder="Vekil Adı Soyadı"
                         />
                         <input
                           type="text"
-                          className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none"
+                          disabled={isSaving}
+                          className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none disabled:opacity-50"
                           value={member.proxyTitle || ''}
                           onChange={(e) => updateMember(member.id, { proxyTitle: e.target.value })}
                           placeholder="Vekil Ünvanı"
@@ -172,8 +185,9 @@ export default function MembersPage() {
                   </div>
                   <div className="col-span-2 flex justify-end">
                     <button
+                      disabled={isSaving}
                       onClick={() => deleteMember(member.id)}
-                      className="text-slate-300 hover:text-red-500 transition-all p-2 rounded-xl hover:bg-red-50"
+                      className="text-slate-300 hover:text-red-500 transition-all p-2 rounded-xl hover:bg-red-50 disabled:opacity-30"
                       title="Sil"
                     >
                       <Trash2 className="w-5 h-5" />
