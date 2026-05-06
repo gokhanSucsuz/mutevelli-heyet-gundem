@@ -1,7 +1,6 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { db, useLiveQuery } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import Link from 'next/link';
 import { Plus, FileText, Calendar, Edit, Trash2 } from 'lucide-react';

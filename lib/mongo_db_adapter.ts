@@ -1,0 +1,141 @@
+
+
+// We'll move the interfaces to db_types.ts later or just keep them here
+export interface Member {
+  id: string;
+  name: string;
+  title: string;
+  order: number;
+  isProxy?: boolean;
+  proxyName?: string;
+  proxyTitle?: string;
+}
+
+export interface MemberSnapshot {
+  id: string;
+  name: string;
+  title: string;
+  isProxy?: boolean;
+  proxyName?: string;
+  proxyTitle?: string;
+  order: number;
+}
+
+export interface TableConfig {
+  columns: string[];
+  rows: string[][];
+  showBorders?: boolean;
+}
+
+export interface FormSubItem {
+  id: string;
+  type: 'numbered' | 'bullet' | 'text';
+  text: string;
+}
+
+export interface FormItem {
+  id: string;
+  type: 'numbered' | 'bullet' | 'text';
+  text: string;
+  hasTable?: boolean;
+  table?: TableConfig;
+  indent?: number;
+  subItems?: FormSubItem[];
+}
+
+export interface OfficialForm {
+  id: string;
+  title: string;
+  documentDate: string;
+  decisionNo: string;
+  decisionDate: string;
+  decisionTime: string;
+  isPostponed: boolean;
+  isLocked?: boolean;
+  headerTop: string;
+  headerMiddle: string;
+  headerBottom: string;
+  headerLine4: string; 
+  items: FormItem[];
+  footerText: string;
+  signatureMembers: string[];
+  signatureSnapshots?: MemberSnapshot[];
+  createdAt: number;
+  updatedAt: number;
+  layout?: any;
+}
+
+export interface Settings {
+  id: string;
+  leftLogoBase64?: string;
+  rightLogoBase64?: string;
+  layout?: any;
+}
+
+class MongoTable<T extends { id: string }> {
+  constructor(private collection: string) {}
+
+  async toArray(): Promise<T[]> {
+    const res = await fetch(`/api/db/${this.collection}`);
+    return res.json();
+  }
+
+  async get(id: string): Promise<T | undefined> {
+    const res = await fetch(`/api/db/${this.collection}?id=${id}`);
+    return res.json();
+  }
+
+  async add(data: T): Promise<string> {
+    await fetch(`/api/db/${this.collection}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return data.id;
+  }
+
+  async put(data: T): Promise<string> {
+    await fetch(`/api/db/${this.collection}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return data.id;
+  }
+
+  async update(id: string, changes: Partial<T>): Promise<number> {
+    const existing = await this.get(id);
+    if (!existing) return 0;
+    const updated = { ...existing, ...changes };
+    await this.put(updated);
+    // Trigger a refresh event for useLiveQuery mock
+    window.dispatchEvent(new CustomEvent(`db-update-${this.collection}`));
+    return 1;
+  }
+
+  async delete(id: string): Promise<void> {
+    await fetch(`/api/db/${this.collection}?id=${id}`, { method: 'DELETE' });
+    window.dispatchEvent(new CustomEvent(`db-update-${this.collection}`));
+  }
+
+  async count(): Promise<number> {
+    const arr = await this.toArray();
+    return arr.length;
+  }
+
+  // Add more methods as needed by the UI
+  orderBy(field: string) {
+    return {
+      toArray: async () => {
+        const arr = await this.toArray();
+        return arr.sort((a: any, b: any) => (a[field] > b[field] ? 1 : -1));
+      }
+    };
+  }
+}
+
+export const db = {
+  members: new MongoTable<Member>('members'),
+  forms: new MongoTable<OfficialForm>('forms'),
+  settings: new MongoTable<Settings>('settings'),
+};

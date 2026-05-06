@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { db, useLiveQuery } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { DebouncedInput } from '@/components/DebouncedInput';

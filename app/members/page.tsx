@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Member } from '@/lib/db';
+import { db, useLiveQuery, Member } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Trash2, GripVertical, UserCheck, UserPlus } from 'lucide-react';
