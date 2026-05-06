@@ -76,13 +76,29 @@ class MongoTable<T extends { id: string }> {
   constructor(private collection: string) {}
 
   async toArray(): Promise<T[]> {
-    const res = await fetch(`/api/db/${this.collection}`);
-    return res.json();
+    try {
+      const res = await fetch(`/api/db/${this.collection}`);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        console.error(`DB Error (${this.collection}):`, data?.error || res.statusText);
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.error(`Fetch Error (${this.collection}):`, e);
+      return [];
+    }
   }
 
   async get(id: string): Promise<T | undefined> {
-    const res = await fetch(`/api/db/${this.collection}?id=${id}`);
-    return res.json();
+    try {
+      const res = await fetch(`/api/db/${this.collection}?id=${id}`);
+      if (!res.ok) return undefined;
+      const data = await res.json();
+      return data?.error ? undefined : data;
+    } catch (e) {
+      return undefined;
+    }
   }
 
   async add(data: T): Promise<string> {
