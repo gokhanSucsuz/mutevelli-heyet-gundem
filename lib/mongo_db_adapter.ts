@@ -126,6 +126,12 @@ class MongoTable<T extends { id: string }> {
   // Add more methods as needed by the UI
   orderBy(field: string) {
     return {
+      reverse: () => ({
+        toArray: async () => {
+          const arr = await this.toArray();
+          return arr.sort((a: any, b: any) => (a[field] < b[field] ? 1 : -1));
+        }
+      }),
       toArray: async () => {
         const arr = await this.toArray();
         return arr.sort((a: any, b: any) => (a[field] > b[field] ? 1 : -1));

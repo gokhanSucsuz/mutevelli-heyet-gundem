@@ -11,7 +11,7 @@ const models: any = {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { collection: string } }
+  { params }: { params: Promise<{ collection: string }> }
 ) {
   try {
     await dbConnect();
@@ -45,7 +45,7 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { collection: string } }
+  { params }: { params: Promise<{ collection: string }> }
 ) {
   try {
     await dbConnect();
@@ -72,7 +72,7 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { collection: string } }
+  { params }: { params: Promise<{ collection: string }> }
 ) {
   try {
     await dbConnect();
