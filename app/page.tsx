@@ -86,7 +86,7 @@ export default function FormsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {forms.map(form => (
-            <Link key={form.id} href={`/forms/${form.id}`} className="block group">
+            <Link key={form.id || (form as any)._id} href={`/forms/${form.id}`} className="block group">
               <div className="bg-white rounded border border-slate-300 p-5 hover:border-blue-500 hover:shadow-md transition-all h-full flex flex-col relative z-0">
                 <div className="flex justify-between items-start mb-4">
                   <div className="bg-blue-50 text-blue-700 p-2 rounded">

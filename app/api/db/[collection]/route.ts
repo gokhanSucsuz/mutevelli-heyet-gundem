@@ -25,20 +25,42 @@ export async function GET(
     if (id) {
       const doc = await model.findById(id);
       if (!doc) return NextResponse.json(null);
-      return NextResponse.json({
-        ...decryptData(doc.payload),
-        _id: doc._id
-      });
+      const decrypted = decryptData(doc.payload);
+      const base = { id: doc._id.toString(), _id: doc._id };
+      
+      let data;
+      if (collection === 'forms') {
+        data = { items: [], signatureMembers: [], headerTop: '', headerLine4: '', footerText: '', title: 'İsimsiz Form', layout: {}, ...decrypted, ...base };
+      } else if (collection === 'members') {
+        data = { name: 'İsimsiz Üye', title: '', order: 0, ...decrypted, ...base };
+      } else if (collection === 'settings') {
+        data = { layout: {}, ...decrypted, ...base };
+      } else {
+        data = { ...(decrypted || {}), ...base };
+      }
+      return NextResponse.json(data);
     }
 
     const docs = await model.find({});
-    const decryptedDocs = docs.map((doc: any) => ({
-      ...decryptData(doc.payload),
-      _id: doc._id
-    }));
+    const decryptedDocs = docs.map((doc: any) => {
+      const decrypted = decryptData(doc.payload);
+      const base = { id: doc._id.toString(), _id: doc._id };
+      
+      if (collection === 'forms') {
+        return { items: [], signatureMembers: [], headerTop: '', headerLine4: '', footerText: '', title: 'İsimsiz Form', layout: {}, ...decrypted, ...base };
+      }
+      if (collection === 'members') {
+        return { name: 'İsimsiz Üye', title: '', order: 0, ...decrypted, ...base };
+      }
+      if (collection === 'settings') {
+        return { layout: {}, ...decrypted, ...base };
+      }
+      return { ...(decrypted || {}), ...base };
+    });
     
     return NextResponse.json(decryptedDocs);
   } catch (error: any) {
+    console.error('API GET ERROR:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

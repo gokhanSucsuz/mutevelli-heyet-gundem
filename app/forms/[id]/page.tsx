@@ -10,7 +10,7 @@ import {
   Save, Printer, ArrowLeft, Plus, Trash2, 
   Table as TableIcon, CheckSquare, ListOrdered, Minus, Lock, Unlock,
   CheckCircle, ArrowRight, ArrowUp, ArrowDown, ChevronUp, ChevronDown,
-  FileText, MessageSquare, Users, Eye, Edit3
+  FileText, MessageSquare, Users, Eye, Edit3, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -206,7 +206,7 @@ const tablePad = tablePaddings[paddingKey];
             )}
           </div>
           <div className="flex flex-col items-end gap-1 text-right" style={{ fontSize: form.layout?.fontSizeHeaderInfo ? `${form.layout?.fontSizeHeaderInfo}px` : 'inherit' }}>
-            {form.headerLine4.includes('<') ? (
+            {form.headerLine4?.includes('<') ? (
               <div className="rich-text-preview" dangerouslySetInnerHTML={{ __html: form.headerLine4 }} />
             ) : (
               <div>{form.headerLine4}</div>
@@ -217,7 +217,7 @@ const tablePad = tablePaddings[paddingKey];
 
         {/* Items */}
         <div className={`${itemSpaceY} flex-1`} style={{ fontSize: form.layout?.fontSizeContent ? `${form.layout?.fontSizeContent}px` : '15px' }}>
-          {form.items.map((item, index) => renderItem(item, index))}
+          {form.items?.map((item, index) => renderItem(item, index))}
         </div>
 
         {/* Decision Note and Signatures - Kept together on same page */}
@@ -382,66 +382,90 @@ const tablePad = tablePaddings[paddingKey];
 
 export default function FormEditorPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
-  
   const form = useLiveQuery(() => db.forms.get(id));
   const allMembers = useLiveQuery(() => db.members.orderBy('order').toArray());
   const settings = useLiveQuery(() => db.settings.get('default'));
   
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor');
+  const [localForm, setLocalForm] = useState<OfficialForm | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-  
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: form?.title || 'Karar Formu',
-  });
 
-  if (!form || !allMembers) return <div className="p-8 text-center">Yükleniyor...</div>;
+  useEffect(() => {
+    if (form) {
+      const draft = localStorage.getItem(`draft_form_${id}`);
+      if (draft) {
+        try {
+          const draftData = JSON.parse(draft);
+          if (draftData.updatedAt > (form.updatedAt || 0)) {
+            setLocalForm(draftData);
+            setIsDirty(true);
+            return;
+          }
+        } catch (e) {}
+      }
+      setLocalForm(form);
+    }
+  }, [form, id]);
 
-  const updateForm = async (updates: Partial<OfficialForm>) => {
-    // eslint-disable-next-line react-hooks/purity
-    await db.forms.update(id, { ...updates, updatedAt: Date.now() });
+  const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: localForm?.title || 'Karar Formu' });
+
+  if (!localForm || !allMembers) return <div className="p-8 text-center text-slate-500 italic">Yükleniyor...</div>;
+
+  const updateForm = (updates: Partial<OfficialForm>) => {
+    if (isSaving) return;
+    const updated = { ...localForm, ...updates, updatedAt: Date.now() };
+    setLocalForm(updated);
+    setIsDirty(true);
+    localStorage.setItem(`draft_form_${id}`, JSON.stringify(updated));
   };
 
-  const addItem = async (type: 'numbered' | 'bullet' = 'numbered') => {
-    const newItem: FormItem = {
-      id: uuidv4(),
-      type,
-      text: '',
-    };
-    await updateForm({ items: [...form.items, newItem] });
+  const saveToCloud = async () => {
+    if (!isDirty || isSaving) return;
+    setIsSaving(true);
+    try {
+      await db.forms.put(localForm);
+      setIsDirty(false);
+      localStorage.removeItem(`draft_form_${id}`);
+    } catch (e) {
+      alert('Hata: Buluta kayıt yapılamadı. İnternet bağlantınızı kontrol edin.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const addItemAt = async (index: number, type: 'numbered' | 'bullet' = 'numbered') => {
-    const newItem: FormItem = {
-      id: uuidv4(),
-      type,
-      text: '',
-    };
-    const newItems = [...form.items];
+  const addItem = (type: 'numbered' | 'bullet' = 'numbered') => {
+    const newItem: FormItem = { id: uuidv4(), type, text: '' };
+    updateForm({ items: [...(localForm.items || []), newItem] });
+  };
+
+  const addItemAt = (index: number, type: 'numbered' | 'bullet' = 'numbered') => {
+    const newItem: FormItem = { id: uuidv4(), type, text: '' };
+    const newItems = [...(localForm.items || [])];
     newItems.splice(index, 0, newItem);
-    await updateForm({ items: newItems });
+    updateForm({ items: newItems });
   };
 
-  const updateItem = async (itemId: string, updates: Partial<FormItem>) => {
-    const newItems = form.items.map(item => item.id === itemId ? { ...item, ...updates } : item);
-    await updateForm({ items: newItems });
+  const updateItem = (itemId: string, updates: Partial<FormItem>) => {
+    const newItems = localForm.items?.map(item => item.id === itemId ? { ...item, ...updates } : item);
+    updateForm({ items: newItems });
   };
 
-  const removeItem = async (itemId: string) => {
-    const newItems = form.items.filter(item => item.id !== itemId);
-    await updateForm({ items: newItems });
+  const removeItem = (itemId: string) => {
+    const newItems = localForm.items?.filter(item => item.id !== itemId);
+    updateForm({ items: newItems });
   };
 
-  const addTableToItem = async (itemId: string) => {
+  const addTableToItem = (itemId: string) => {
     updateItem(itemId, { 
       hasTable: true, 
       table: { columns: ['SIRA NO', 'ADI SOYADI', 'T.C', 'TALEBİ', 'KARAR'], rows: [['1', '', '', '', '']] } 
     });
   };
 
-  const removeTableFromItem = async (itemId: string) => {
+  const removeTableFromItem = (itemId: string) => {
     updateItem(itemId, { hasTable: false, table: undefined });
   };
 
@@ -449,82 +473,64 @@ export default function FormEditorPage() {
     <AppLayout>
       <div className="flex flex-col h-full h-[calc(100vh-2rem)]">
         {/* Header Actions */}
-        <div className="flex items-center justify-between bg-white p-5 rounded border border-slate-300 shadow-sm mb-6 shrink-0 z-10 relative">
-          <div className="flex items-center gap-4 w-full">
-            <Link href="/" className="text-slate-400 hover:text-slate-600">
+        <div className="flex items-center justify-between bg-white p-3 rounded border border-slate-300 shadow-sm mb-6 shrink-0 z-10 relative">
+          <div className="flex items-center gap-3 w-full overflow-hidden">
+            <Link href="/" className="text-slate-400 hover:text-slate-600 shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <DebouncedInput 
-              type="text" 
-              value={form.title} 
-              disabled={form.isLocked && !form.isPostponed}
-              onChange={(val) => updateForm({ title: val })}
-              className={`text-lg font-bold bg-transparent border-none focus:ring-2 focus:ring-blue-500 rounded p-1 text-slate-800 placeholder-slate-400 uppercase outline-none w-full max-w-sm ${form.isLocked && !form.isPostponed ? 'cursor-not-allowed opacity-70' : ''}`}
-              placeholder="Form Başlığı (Örn: Nisan 2023 Toplantısı)"
-            />
+            <div className="flex flex-col min-w-0">
+              <input 
+                type="text" 
+                value={localForm.title} 
+                onChange={(e) => updateForm({ title: e.target.value })}
+                className="text-sm font-bold bg-transparent border-none focus:ring-1 focus:ring-blue-200 rounded p-0.5 text-slate-800 placeholder-slate-400 uppercase outline-none truncate w-full"
+                placeholder="Form Başlığı"
+              />
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">DÜZENLEME MODU</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="bg-slate-100 p-1 rounded flex">
+
+          <div className="flex items-center gap-2 shrink-0 ml-4">
+            {isDirty && (
+              <button 
+                onClick={saveToCloud}
+                disabled={isSaving}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-bold text-[10px] shadow-sm transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                <span className="hidden sm:inline">BULUTA KAYDET</span>
+              </button>
+            )}
+            
+            <div className="bg-slate-100 p-1 rounded flex shrink-0">
               <button
                 onClick={() => setActiveTab('editor')}
-                className={`px-4 sm:px-6 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2 ${
-                  activeTab === 'editor' 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'text-slate-500 hover:bg-slate-100'
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 ${
+                  activeTab === 'editor' ? 'bg-white text-blue-600 shadow-sm rounded' : 'text-slate-500 hover:bg-slate-200'
                 }`}
-                title="Düzenleyici"
               >
-                <Edit3 className="w-4 h-4" />
-                <span className="hidden sm:block">Düzenleyici</span>
+                <Edit3 className="w-3.5 h-3.5" />
+                <span className="hidden sm:block">DÜZENLE</span>
               </button>
               <button
                 onClick={() => setActiveTab('preview')}
-                className={`px-4 sm:px-6 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2 ${
-                  activeTab === 'preview' 
-                    ? 'bg-blue-600 text-white shadow-md' 
-                    : 'text-slate-500 hover:bg-slate-100'
+                className={`px-3 py-1.5 text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 ${
+                  activeTab === 'preview' ? 'bg-white text-blue-600 shadow-sm rounded' : 'text-slate-500 hover:bg-slate-200'
                 }`}
-                title="Önizleme"
               >
-                <Eye className="w-4 h-4" />
-                <span className="hidden sm:block">Önizleme</span>
+                <Eye className="w-3.5 h-3.5" />
+                <span className="hidden sm:block">ÖNİZLE</span>
               </button>
             </div>
+
             {activeTab === 'preview' && (
-              <div className="flex gap-2">
-                {!form.isLocked && (
-                  <button 
-                    onClick={async () => {
-                      if (confirm('Kararı kesinleştirmek istiyor musunuz? Bu işlemden sonra sadece toplantı ertelenirse değişiklik yapılabilir.')) {
-                        // Create snapshots
-                        const snapshots = allMembers
-                          .filter(m => form.signatureMembers.includes(m.id))
-                          .map(m => ({
-                            id: m.id,
-                            name: m.name,
-                            title: m.title,
-                            isProxy: m.isProxy,
-                            proxyName: m.proxyName,
-                            proxyTitle: m.proxyTitle,
-                            order: m.order
-                          }));
-                        await updateForm({ isLocked: true, signatureSnapshots: snapshots });
-                      }
-                    }}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all text-[11px] uppercase tracking-wider active:scale-95"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    KARARI KESİNLEŞTİR
-                  </button>
-                )}
-                <button 
-                  onClick={() => handlePrint()}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all text-[11px] uppercase tracking-wider active:scale-95"
-                >
-                  <Printer className="w-4 h-4" />
-                  YAZDIR / PDF AL
-                </button>
-              </div>
+              <button 
+                onClick={() => handlePrint()}
+                className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold text-[10px] shadow-sm transition-all active:scale-95"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span className="hidden sm:block">YAZDIR</span>
+              </button>
             )}
           </div>
         </div>
@@ -591,7 +597,7 @@ export default function FormEditorPage() {
                         type="checkbox" 
                         id="isPostponed"
                         className="rounded text-blue-700 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
-                        checked={form.isPostponed || false}
+                        checked={localForm.isPostponed || false}
                         onChange={(e) => updateForm({ isPostponed: e.target.checked })}
                       />
                       <label htmlFor="isPostponed" className="text-[11px] font-bold text-blue-700 cursor-pointer select-none uppercase">
@@ -604,37 +610,37 @@ export default function FormEditorPage() {
                     <div>
                       <div className="flex items-center gap-1 mb-1">
                         <label className="text-xs font-bold text-slate-500 uppercase block">Karar Tarihi</label>
-                        {!form.isPostponed && <Lock className="w-3 h-3 text-slate-400" />}
+                        {!localForm.isPostponed && <Lock className="w-3 h-3 text-slate-400" />}
                       </div>
                       <input 
                         type="date"
-                        disabled={!form.isPostponed}
-                        className={`w-full text-sm border border-slate-300 rounded p-2 outline-none transition-all ${!form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500 border-blue-200'}`}
-                        value={form.decisionDate || ''}
+                        disabled={!localForm.isPostponed}
+                        className={`w-full text-sm border border-slate-300 rounded p-2 outline-none transition-all ${!localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500 border-blue-200'}`}
+                        value={localForm.decisionDate || ''}
                         onChange={(e) => updateForm({ decisionDate: e.target.value })}
                       />
-                      {!form.isPostponed && <p className="text-[10px] text-slate-400 mt-1 italic">* Değiştirmek için 'Ertelendi' seçiniz.</p>}
+                      {!localForm.isPostponed && <p className="text-[10px] text-slate-400 mt-1 italic">* Değiştirmek için 'Ertelendi' seçiniz.</p>}
                     </div>
                     <div>
                       <div className="flex items-center gap-1 mb-1">
                         <label className="text-xs font-bold text-slate-500 uppercase block">Karar Saati</label>
-                        {!form.isPostponed && <Lock className="w-3 h-3 text-slate-400" />}
+                        {!localForm.isPostponed && <Lock className="w-3 h-3 text-slate-400" />}
                       </div>
                       <input 
                         type="time"
-                        disabled={!form.isPostponed}
-                        className={`w-full text-sm border border-slate-300 rounded p-2 outline-none transition-all ${!form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500 border-blue-200'}`}
-                        value={form.decisionTime || ''}
+                        disabled={!localForm.isPostponed}
+                        className={`w-full text-sm border border-slate-300 rounded p-2 outline-none transition-all ${!localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500 border-blue-200'}`}
+                        value={localForm.decisionTime || ''}
                         onChange={(e) => updateForm({ decisionTime: e.target.value })}
                       />
                     </div>
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Karar No</label>
-                      <DebouncedInput 
-                        className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${form.isLocked && !form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
-                        value={form.decisionNo || ''}
-                        disabled={form.isLocked && !form.isPostponed}
-                        onChange={(val) => updateForm({ decisionNo: val })}
+                      <input 
+                        className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${localForm.isLocked && !localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
+                        value={localForm.decisionNo || ''}
+                        disabled={localForm.isLocked && !localForm.isPostponed}
+                        onChange={(e) => updateForm({ decisionNo: e.target.value })}
                       />
                     </div>
                   </div>
@@ -646,8 +652,8 @@ export default function FormEditorPage() {
                         <label className="text-[10px] font-bold text-slate-400 uppercase">Satır Aralığı:</label>
                         <select 
                           className="text-[10px] border border-slate-300 rounded px-1.5 py-0.5"
-                          value={form.layout?.headerLineSpacing || 'normal'}
-                          onChange={(e) => updateForm({ layout: { ...form.layout!, headerLineSpacing: e.target.value } })}
+                          value={localForm.layout?.headerLineSpacing || 'normal'}
+                          onChange={(e) => updateForm({ layout: { ...localForm.layout!, headerLineSpacing: e.target.value } })}
                         >
                           <option value="0.8">Çok Dar</option>
                           <option value="1">Dar</option>
@@ -657,8 +663,8 @@ export default function FormEditorPage() {
                       </div>
                     </div>
                     <RichTextEditor 
-                      value={form.headerTop}
-                      disabled={form.isLocked && !form.isPostponed}
+                      value={localForm.headerTop}
+                      disabled={localForm.isLocked && !localForm.isPostponed}
                       onChange={(val) => updateForm({ headerTop: val })}
                       placeholder="Başlık metnini girin..."
                     />
@@ -666,11 +672,11 @@ export default function FormEditorPage() {
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tarih / Karar No Görünümü (Belge Üzerindeki)</label>
-                      <DebouncedInput 
-                        className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${form.isLocked && !form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
-                        value={form.headerLine4}
-                        disabled={form.isLocked && !form.isPostponed}
-                        onChange={(val) => updateForm({ headerLine4: val })}
+                      <input 
+                        className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${localForm.isLocked && !localForm.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
+                        value={localForm.headerLine4}
+                        disabled={localForm.isLocked && !localForm.isPostponed}
+                        onChange={(e) => updateForm({ headerLine4: e.target.value })}
                         placeholder="Örn: .../05/2023 - Karar No: 2023/01"
                       />
                     </div>
@@ -685,14 +691,14 @@ export default function FormEditorPage() {
 
                     <div className="flex gap-2">
                       <button 
-                        disabled={form.isLocked && !form.isPostponed}
+                        disabled={localForm.isLocked && !localForm.isPostponed}
                         onClick={() => addItem('numbered')} 
                         className="flex items-center gap-1 text-xs font-bold uppercase bg-slate-100 text-slate-700 px-3 py-1.5 rounded hover:bg-slate-200 border border-slate-300 disabled:opacity-50"
                       >
                         <ListOrdered className="w-4 h-4" /> Numaralı
                       </button>
                       <button 
-                        disabled={form.isLocked && !form.isPostponed}
+                        disabled={localForm.isLocked && !localForm.isPostponed}
                         onClick={() => addItem('bullet')} 
                         className="flex items-center gap-1 text-xs font-bold uppercase bg-slate-100 text-slate-700 px-3 py-1.5 rounded hover:bg-slate-200 border border-slate-300 disabled:opacity-50"
                       >
@@ -703,7 +709,7 @@ export default function FormEditorPage() {
 
                   <div className="space-y-6 mt-4">
                     <AnimatePresence>
-                      {form.items.map((item, index) => {
+                      {localForm.items?.map((item, index) => {
                         const renderEditorItem = (itm: FormItem, idx: number, isSub: boolean = false, parentId: string | null = null, pIdx: number = 0) => {
                           const itemIndex = isSub ? -1 : idx;
                           return (
@@ -761,7 +767,7 @@ export default function FormEditorPage() {
                             <button 
                               onClick={() => {
                                 if (isSub && parentId) {
-                                  const parent = form.items.find(i => i.id === parentId);
+                                  const parent = localForm.items?.find(i => i.id === parentId);
                                   if (parent) {
                                     const newSub = parent.subItems?.filter(s => s.id !== itm.id);
                                     updateItem(parentId, { subItems: newSub });
@@ -783,10 +789,10 @@ export default function FormEditorPage() {
                             <div className="flex-1 space-y-4 min-w-0">
                               <RichTextEditor 
                                 value={itm.text}
-                                disabled={form.isLocked && !form.isPostponed}
+                                disabled={localForm.isLocked && !localForm.isPostponed}
                                 onChange={(val) => {
                                   if (isSub && parentId) {
-                                    const parentItem = form.items.find(i => i.id === parentId);
+                                    const parentItem = localForm.items?.find(i => i.id === parentId);
                                     if (parentItem && parentItem.subItems) {
                                       const newSub = parentItem.subItems.map(s => s.id === itm.id ? { ...s, text: val } : s);
                                       updateItem(parentId, { subItems: newSub });
@@ -920,7 +926,7 @@ export default function FormEditorPage() {
                       return renderEditorItem(item, index);
                     })}
                     </AnimatePresence>
-                    {form.items.length === 0 && (
+                    {localForm.items?.length === 0 && (
                       <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
                         Maddeler ekleyerek başlayın.
                       </div>
@@ -928,7 +934,7 @@ export default function FormEditorPage() {
 
                     <div className="mt-8 flex justify-center pt-4 border-t border-slate-100">
                       <button 
-                        disabled={form.isLocked && !form.isPostponed}
+                        disabled={localForm.isLocked && !localForm.isPostponed}
                         onClick={() => addItem('numbered')}
                         className="flex items-center gap-2 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm group active:scale-95 border border-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -943,8 +949,8 @@ export default function FormEditorPage() {
                 <div id="footer" className="bg-white p-5 rounded border border-slate-300 shadow-sm space-y-4 scroll-mt-20">
                   <h3 className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 pb-2">Karar Notu (Alt Açıklama)</h3>
                   <RichTextEditor 
-                    value={form.footerText}
-                    disabled={form.isLocked && !form.isPostponed}
+                    value={localForm.footerText}
+                    disabled={localForm.isLocked && !localForm.isPostponed}
                     onChange={(val) => updateForm({ footerText: val })}
                     placeholder="Yukarıda maddeler halinde belirtilen..."
                   />
@@ -977,12 +983,12 @@ export default function FormEditorPage() {
                         <input 
                           type="checkbox" 
                           className="rounded text-blue-700 focus:ring-blue-500 w-4 h-4"
-                          checked={form.signatureMembers.includes(member.id)}
-                          disabled={form.isLocked && !form.isPostponed}
+                          checked={localForm.signatureMembers.includes(member.id)}
+                          disabled={localForm.isLocked && !localForm.isPostponed}
                           onChange={(e) => {
                             const newSignatures = e.target.checked 
-                              ? [...form.signatureMembers, member.id]
-                              : form.signatureMembers.filter(id => id !== member.id);
+                              ? [...localForm.signatureMembers, member.id]
+                              : localForm.signatureMembers.filter(id => id !== member.id);
                             updateForm({ signatureMembers: newSignatures });
                           }}
                         />
@@ -1000,7 +1006,7 @@ export default function FormEditorPage() {
           ) : (
              <div className="w-full flex-1 overflow-auto preview-container">
                <div ref={printRef} className="a4-page">
-                 <PrintPreview form={form} members={allMembers} settings={settings} />
+                 <PrintPreview form={localForm} members={allMembers} settings={settings} />
                </div>
              </div>
           )}
