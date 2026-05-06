@@ -9,7 +9,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Quote, Minus, Undo, Redo, Eraser
 } from 'lucide-react'
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import Highlight from '@tiptap/extension-highlight'
 import Typography from '@tiptap/extension-typography'
@@ -51,13 +51,19 @@ export function RichTextEditor({
     setIsMounted(true);
   }, []);
 
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const editor = useEditor({
     extensions,
     content: value,
     immediatelyRender: false,
     editable: !disabled,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        onChange(html);
+      }, 500);
     },
     editorProps: {
       attributes: {
@@ -66,10 +72,14 @@ export function RichTextEditor({
     },
   });
 
-  // Keep content in sync if value prop changes externally (e.g. from DB load)
+  // Keep content in sync only if value prop changes from an external source
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value);
+      // Small optimization: only update if the change is significant
+      // and we are not currently focused (to avoid jumping while typing)
+      if (!editor.isFocused) {
+        editor.commands.setContent(value, false);
+      }
     }
   }, [value, editor]);
 

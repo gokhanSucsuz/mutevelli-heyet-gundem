@@ -10,11 +10,13 @@ import { useReactToPrint } from 'react-to-print';
 import { 
   Save, Printer, ArrowLeft, Plus, Trash2, 
   Table as TableIcon, CheckSquare, ListOrdered, Minus, Lock, Unlock,
-  CheckCircle, ArrowRight
+  CheckCircle, ArrowRight, ArrowUp, ArrowDown, ChevronUp, ChevronDown,
+  FileText, MessageSquare, Users, Eye, Edit3
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { RichTextEditor } from '@/components/RichTextEditor';
+import { DebouncedInput } from '@/components/DebouncedInput';
 
 function PrintPreview({ form, members, settings }: { form: OfficialForm, members: Member[], settings: any }) {
   const activeLayout = settings?.layout || form.layout;
@@ -70,7 +72,9 @@ const tablePad = tablePaddings[paddingKey];
           <div className="flex-1 w-full overflow-hidden leading-tight">
             <div 
               className="rich-text-preview dotted-leader" 
-              dangerouslySetInnerHTML={{ __html: item.text || '' }} 
+              dangerouslySetInnerHTML={{ 
+                __html: (item.text || '').replace(/<p>(.*?)<\/p>/g, '<p><span class="text-content">$1</span></p>') 
+              }} 
             />
           </div>
         </div>
@@ -279,19 +283,30 @@ const tablePad = tablePaddings[paddingKey];
         </div>
       )}
 
+
+
       <style dangerouslySetInnerHTML={{__html: `
         .dotted-leader p { 
-           display: flex; 
-           align-items: center; 
+           display: flex;
+           flex-wrap: wrap;
+           align-items: baseline;
            width: 100%;
            margin-bottom: 0px !important;
+           line-height: 1.5;
+           row-gap: 1.2em; /* Metin yüksekliği kadar (veya yakını) dikey boşluk */
+        }
+        .dotted-leader p span.text-content {
+          flex: 0 0 auto;
+          display: inline;
+          padding-right: 0px;
         }
         .dotted-leader p::after {
           content: "";
-          flex: 1;
-          margin-left: 0.5em; /* Metinden bir boşluk sonra */
+          flex: 1 0 10%; 
           border-bottom: 1.5pt dotted black;
-          height: 0.6em; /* Metin ile dikey ortalı olması için */
+          height: 0px;
+          margin-left: 1ch; /* Metin bittikten sonra tam bir karakter boşluk */
+          margin-bottom: 0.15em;
         }
         .rich-text-preview p { margin-bottom: 0.5rem; }
         .rich-text-preview p:last-child { margin-bottom: 0; }
@@ -440,28 +455,40 @@ export default function FormEditorPage() {
             <Link href="/" className="text-slate-400 hover:text-slate-600">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <input 
+            <DebouncedInput 
               type="text" 
               value={form.title} 
               disabled={form.isLocked && !form.isPostponed}
-              onChange={(e) => updateForm({ title: e.target.value })}
+              onChange={(val) => updateForm({ title: val })}
               className={`text-lg font-bold bg-transparent border-none focus:ring-2 focus:ring-blue-500 rounded p-1 text-slate-800 placeholder-slate-400 uppercase outline-none w-full max-w-sm ${form.isLocked && !form.isPostponed ? 'cursor-not-allowed opacity-70' : ''}`}
               placeholder="Form Başlığı (Örn: Nisan 2023 Toplantısı)"
             />
           </div>
           <div className="flex items-center gap-2">
-            <div className="bg-slate-100 p-1 rounded flex border border-slate-200">
-              <button 
+            <div className="bg-slate-100 p-1 rounded flex">
+              <button
                 onClick={() => setActiveTab('editor')}
-                className={`px-4 py-1.5 rounded text-sm transition-colors font-medium ${activeTab === 'editor' ? 'bg-white shadow-sm text-blue-700 border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`px-4 sm:px-6 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+                  activeTab === 'editor' 
+                    ? 'bg-blue-600 text-white shadow-md' 
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+                title="Düzenleyici"
               >
-                Düzenleyici
+                <Edit3 className="w-4 h-4" />
+                <span className="hidden sm:block">Düzenleyici</span>
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('preview')}
-                className={`px-4 py-1.5 rounded text-sm transition-colors font-medium ${activeTab === 'preview' ? 'bg-white shadow-sm text-blue-700 border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`px-4 sm:px-6 py-2 text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+                  activeTab === 'preview' 
+                    ? 'bg-blue-600 text-white shadow-md' 
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+                title="Önizleme"
               >
-                Önizleme
+                <Eye className="w-4 h-4" />
+                <span className="hidden sm:block">Önizleme</span>
               </button>
             </div>
             {activeTab === 'preview' && (
@@ -506,58 +533,56 @@ export default function FormEditorPage() {
         {/* Content Area with Sidebar */}
         <div className="flex-1 flex gap-8 overflow-hidden relative">
           {activeTab === 'editor' && (
-            <div className="w-52 shrink-0 hidden lg:block sticky top-0 h-[calc(100vh-10rem)]">
-              <div className="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-slate-300/50 shadow-xl space-y-4 sticky top-4 transition-all duration-300">
-                <div className="flex items-center gap-2 px-1 mb-2">
+            <div className="fixed right-2 lg:right-6 top-1/2 -translate-y-1/2 z-40 print:hidden transition-all duration-300">
+              <div className="flex flex-col gap-1 lg:gap-2 p-1.5 lg:p-2 bg-white/60 hover:bg-white/95 backdrop-blur-md rounded-xl lg:rounded-3xl border border-slate-200 shadow-xl lg:shadow-2xl opacity-60 hover:opacity-100 transition-all duration-500 group/panel w-10 lg:w-12 hover:w-44 overflow-hidden">
+                <div className="flex items-center gap-2 px-2 mb-1 opacity-0 group-hover/panel:opacity-100 transition-opacity duration-300 min-w-max">
                   <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div>
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Hızlı Erişim</h3>
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">Navigasyon</h3>
                 </div>
-                <nav className="flex flex-col gap-1.5">
+                <nav className="flex flex-col gap-1 lg:gap-1.5">
                   {[
-                    { id: 'header', label: 'Başlık Bilgileri' },
-                    { id: 'items', label: 'Gündem Maddeleri' },
-                    { id: 'footer', label: 'Karar Notu' },
-                    { id: 'signatures', label: 'İmzacılar' },
-                  ].map(section => (
-                    <button 
-                      key={section.id}
-                      onClick={() => {
-                        const el = document.getElementById(section.id);
-                        if (el) {
-                           const container = el.closest('.overflow-y-auto');
-                           if (container) {
-                             container.scrollTo({
-                               top: el.offsetTop - 20,
-                               behavior: 'smooth'
-                             });
-                           } else {
-                             el.scrollIntoView({ behavior: 'smooth' });
-                           }
-                        }
-                      }}
-                      className="group flex items-center justify-between px-3 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all duration-300 uppercase tracking-tight active:scale-95 shadow-sm hover:shadow-blue-200"
-                    >
-                      <span>{section.label}</span>
-                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                    </button>
-                  ))}
+                    { id: 'top', label: 'En Üste', icon: ArrowUp },
+                    { id: 'header', label: 'Başlık', icon: FileText },
+                    { id: 'items', label: 'Gündem', icon: ListOrdered },
+                    { id: 'footer', label: 'Not', icon: MessageSquare },
+                    { id: 'signatures', label: 'İmzalar', icon: Users },
+                    { id: 'bottom', label: 'En Alta', icon: ArrowDown },
+                  ].map(section => {
+                    const Icon = section.icon;
+                    return (
+                      <button 
+                        key={section.id}
+                        onClick={() => {
+                          const container = document.getElementById('main-scroll-container');
+                          if (!container) return;
+                          if (section.id === 'top') {
+                            container.scrollTo({ top: 0, behavior: 'smooth' });
+                          } else if (section.id === 'bottom') {
+                            container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+                          } else {
+                            const el = document.getElementById(section.id);
+                            if (el) {
+                               const offset = el.offsetTop;
+                               container.scrollTo({ top: offset, behavior: 'smooth' });
+                            }
+                          }
+                        }}
+                        className="group/btn flex items-center p-2 lg:p-2.5 text-[10px] font-bold text-slate-600 hover:bg-blue-600 hover:text-white rounded-lg lg:rounded-xl transition-all duration-300 uppercase tracking-tight active:scale-90 border border-transparent hover:border-blue-400 min-w-max"
+                        title={section.label}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="opacity-0 group-hover/panel:opacity-100 transition-opacity duration-300 ml-3 whitespace-nowrap">{section.label}</span>
+                      </button>
+                    );
+                  })}
                 </nav>
-                {form.isLocked && !form.isPostponed && (
-                  <div className="mt-4 p-3 bg-red-50 rounded-xl border border-red-100 flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-red-600">
-                      <Lock className="w-4 h-4" />
-                      <span className="text-[10px] font-bold uppercase">Kilitli</span>
-                    </div>
-                    <p className="text-[9px] text-red-700 leading-tight font-medium">Bu belge kesinleştirilmiştir. Değişiklik yapılamaz.</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto pb-20">
+          <div className="flex-1 pb-20 w-full overflow-x-hidden">
             {activeTab === 'editor' ? (
-              <div className="max-w-4xl mx-auto space-y-8 px-4">
+              <div className="w-full max-w-5xl mx-auto space-y-8 px-2 sm:px-4">
                 {/* Metadata Section */}
                 <div id="header" className="bg-white p-5 rounded border border-slate-300 shadow-sm space-y-4 scroll-mt-20">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -606,11 +631,11 @@ export default function FormEditorPage() {
                     </div>
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Karar No</label>
-                      <input 
+                      <DebouncedInput 
                         className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${form.isLocked && !form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
                         value={form.decisionNo || ''}
                         disabled={form.isLocked && !form.isPostponed}
-                        onChange={(e) => updateForm({ decisionNo: e.target.value })}
+                        onChange={(val) => updateForm({ decisionNo: val })}
                       />
                     </div>
                   </div>
@@ -642,11 +667,11 @@ export default function FormEditorPage() {
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Tarih / Karar No Görünümü (Belge Üzerindeki)</label>
-                      <input 
+                      <DebouncedInput 
                         className={`w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none ${form.isLocked && !form.isPostponed ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}`} 
                         value={form.headerLine4}
                         disabled={form.isLocked && !form.isPostponed}
-                        onChange={(e) => updateForm({ headerLine4: e.target.value })}
+                        onChange={(val) => updateForm({ headerLine4: val })}
                         placeholder="Örn: .../05/2023 - Karar No: 2023/01"
                       />
                     </div>
@@ -983,6 +1008,31 @@ export default function FormEditorPage() {
         </div>
       </div>
     </div>
+    {/* Quick Navigation Floating Buttons */}
+    {activeTab === 'editor' && (
+      <div className="fixed bottom-10 right-10 flex flex-col gap-3 z-50 print:hidden">
+        <button 
+          onClick={() => {
+            const container = document.getElementById('main-scroll-container');
+            container?.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 hover:scale-110 transition-all active:scale-95 group"
+          title="En Üste Git"
+        >
+          <ArrowUp className="w-6 h-6" />
+        </button>
+        <button 
+          onClick={() => {
+            const container = document.getElementById('main-scroll-container');
+            container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+          }}
+          className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 hover:scale-110 transition-all active:scale-95 group"
+          title="En Alta Git"
+        >
+          <ArrowDown className="w-6 h-6" />
+        </button>
+      </div>
+    )}
   </AppLayout>
 );
 }

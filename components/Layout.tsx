@@ -105,7 +105,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-10"></div>
         </header>
 
-        <div className="flex-1 overflow-y-auto relative p-4 sm:p-8">
+        <div id="main-scroll-container" className="flex-1 overflow-y-auto relative p-2 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-6xl">
             {children}
           </div>

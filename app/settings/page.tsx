@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { ImagePlus, Trash2 } from 'lucide-react';
+import { DebouncedInput } from '@/components/DebouncedInput';
 
 export default function SettingsPage() {
   const settings = useLiveQuery(() => db.settings.get('default'));
@@ -157,11 +158,11 @@ export default function SettingsPage() {
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Başlık Boyutu</label>
               <div className="flex items-center gap-2">
-                <input
+                <DebouncedInput
                   type="number"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.fontSizeTitle || 16}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, fontSizeTitle: Number(e.target.value) } })}
+                  value={String(settings?.layout?.fontSizeTitle || 16)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, fontSizeTitle: Number(val) } })}
                 />
                 <span className="text-xs text-slate-500 font-bold">px</span>
               </div>
@@ -169,11 +170,11 @@ export default function SettingsPage() {
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Metin Boyutu</label>
               <div className="flex items-center gap-2">
-                <input
+                <DebouncedInput
                   type="number"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.fontSizeContent || 15}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, fontSizeContent: Number(e.target.value) } })}
+                  value={String(settings?.layout?.fontSizeContent || 15)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, fontSizeContent: Number(val) } })}
                 />
                 <span className="text-xs text-slate-500 font-bold">px</span>
               </div>
@@ -193,11 +194,11 @@ export default function SettingsPage() {
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sayfa Kenar (X)</label>
               <div className="flex items-center gap-2">
-                <input
+                <DebouncedInput
                   type="number"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.marginX || 15}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, marginX: Number(e.target.value) } })}
+                  value={String(settings?.layout?.marginX || 15)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, marginX: Number(val) } })}
                 />
                 <span className="text-xs text-slate-500 font-bold">mm</span>
               </div>
@@ -205,11 +206,11 @@ export default function SettingsPage() {
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sayfa Alt/Üst (Y)</label>
               <div className="flex items-center gap-2">
-                <input
+                <DebouncedInput
                   type="number"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.marginY || 15}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, marginY: Number(e.target.value) } })}
+                  value={String(settings?.layout?.marginY || 15)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, marginY: Number(val) } })}
                 />
                 <span className="text-xs text-slate-500 font-bold">mm</span>
               </div>
@@ -221,30 +222,43 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="col-span-2">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Filigran Metni</label>
-                <input
+                <DebouncedInput
                   type="text"
                   placeholder="Örn: GİZLİ, TASLAK"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
                   value={settings?.layout?.watermarkText || ''}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkText: e.target.value } })}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkText: val } })}
                 />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Opaklık (%)</label>
-                <input
+                <DebouncedInput
                   type="number" min="0" max="100"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.watermarkOpacity ?? 10}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkOpacity: Number(e.target.value) } })}
+                  value={String(settings?.layout?.watermarkOpacity ?? 10)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkOpacity: Number(val) } })}
                 />
               </div>
               <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Açı (Derece)</label>
+                <div className="flex items-center gap-2">
+                  <DebouncedInput
+                    type="number"
+                    min="-360" max="360"
+                    className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={String(settings?.layout?.watermarkAngle ?? -45)}
+                    onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkAngle: Number(val) } })}
+                  />
+                  <span className="text-xs text-slate-500 font-bold">°</span>
+                </div>
+              </div>
+              <div>
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Boyut (px)</label>
-                <input
+                <DebouncedInput
                   type="number"
                   className="w-full text-sm border border-slate-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={settings?.layout?.watermarkSize ?? 120}
-                  onChange={(e) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkSize: Number(e.target.value) } })}
+                  value={String(settings?.layout?.watermarkSize ?? 120)}
+                  onChange={(val) => db.settings.update('default', { layout: { ...settings?.layout!, watermarkSize: Number(val) } })}
                 />
               </div>
             </div>

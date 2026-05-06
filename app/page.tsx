@@ -94,7 +94,11 @@ export default function FormsPage() {
                     <FileText className="w-6 h-6" />
                   </div>
                   <button 
-                    onClick={(e) => deleteForm(form.id, e)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      deleteForm(form.id, e);
+                    }}
                     className="text-slate-400 hover:text-red-600 p-1 bg-white hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 relative"
                     title="Formu Sil"
                   >

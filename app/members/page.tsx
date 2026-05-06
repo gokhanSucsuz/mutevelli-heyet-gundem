@@ -6,6 +6,7 @@ import { db, Member } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Trash2, GripVertical, UserCheck, UserPlus } from 'lucide-react';
+import { DebouncedInput } from '@/components/DebouncedInput';
 
 export default function MembersPage() {
   const members = useLiveQuery(() => db.members.orderBy('order').toArray());
@@ -70,18 +71,18 @@ export default function MembersPage() {
                     <GripVertical className="w-5 h-5" />
                   </div>
                   <div className="col-span-3 space-y-2">
-                    <input
+                    <DebouncedInput
                       type="text"
                       className="w-full bg-white border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none shadow-sm"
                       value={member.name}
-                      onChange={(e) => updateMember(member.id, { name: e.target.value })}
+                      onChange={(val) => updateMember(member.id, { name: val })}
                       placeholder="Adı Soyadı"
                     />
-                    <input
+                    <DebouncedInput
                       type="text"
                       className="w-full bg-white/50 border border-slate-200 focus:ring-2 focus:ring-blue-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none shadow-sm"
                       value={member.title}
-                      onChange={(e) => updateMember(member.id, { title: e.target.value })}
+                      onChange={(val) => updateMember(member.id, { title: val })}
                       placeholder="Ünvan (Örn: Üye, Vali Yrd.)"
                     />
                   </div>
@@ -99,18 +100,18 @@ export default function MembersPage() {
                   <div className="col-span-5">
                     {member.isProxy ? (
                       <div className="grid grid-cols-2 gap-3">
-                        <input
+                        <DebouncedInput
                           type="text"
                           className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-900 text-sm font-bold outline-none"
                           value={member.proxyName || ''}
-                          onChange={(e) => updateMember(member.id, { proxyName: e.target.value })}
+                          onChange={(val) => updateMember(member.id, { proxyName: val })}
                           placeholder="Vekil Adı Soyadı"
                         />
-                        <input
+                        <DebouncedInput
                           type="text"
                           className="w-full bg-orange-50 border border-orange-100 focus:ring-2 focus:ring-orange-500 p-2 rounded-lg text-slate-600 text-[11px] font-bold uppercase outline-none"
                           value={member.proxyTitle || ''}
-                          onChange={(e) => updateMember(member.id, { proxyTitle: e.target.value })}
+                          onChange={(val) => updateMember(member.id, { proxyTitle: val })}
                           placeholder="Vekil Ünvanı"
                         />
                       </div>
