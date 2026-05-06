@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, OfficialForm, FormItem, Member } from '@/lib/db';
+import { db, OfficialForm, FormItem, Member, MemberSnapshot } from '@/lib/db';
 import { AppLayout } from '@/components/Layout';
 import { useParams, useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
